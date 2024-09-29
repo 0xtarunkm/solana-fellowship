@@ -11,13 +11,10 @@ import {
   MINT_SIZE,
   TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
-import { useState } from 'react';
 
 export const useSpl = () => {
   const wallet = useWallet();
   const { connection } = useConnection();
-
-  const [decimals, setDecimals] = useState<number | null>(null);
 
   const createToken = async (decimals: number) => {
     if (!wallet.publicKey || !wallet.connected) {
@@ -50,8 +47,6 @@ export const useSpl = () => {
       const recentBlockhash = await connection.getLatestBlockhash();
       transaction.recentBlockhash = recentBlockhash.blockhash;
       transaction.feePayer = wallet.publicKey;
-
-      setDecimals(decimals);
 
       transaction.partialSign(mintKeypair);
       await wallet.sendTransaction(transaction, connection);
