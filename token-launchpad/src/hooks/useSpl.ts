@@ -1,54 +1,113 @@
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import {
-  clusterApiUrl,
-  Connection,
   Keypair,
+  LAMPORTS_PER_SOL,
+  PublicKey,
   SystemProgram,
   Transaction,
 } from '@solana/web3.js';
 import {
   createInitializeMint2Instruction,
-  getMinimumBalanceForRentExemptAccount,
   MINT_SIZE,
+  TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
+import { useState } from 'react';
 
 export const useSpl = () => {
-  const { publicKey, connected } = useWallet();
-  const connection = new Connection(clusterApiUrl('devnet'));
+  const wallet = useWallet();
+  const { connection } = useConnection();
 
-  const createToken = async (
-    name: string,
-    symbol: string,
-    decimals: number,
-    imageUrl: string,
-    initialSuppy: number
-  ) => {
-    if (!publicKey || !connected) {
+  const [decimals, setDecimals] = useState<number | null>(null);
+
+  const createToken = async (decimals: number) => {
+    if (!wallet.publicKey || !wallet.connected) {
       throw new Error('Wallet not connected');
     }
 
-    const lamports = await getMinimumBalanceForRentExemptAccount(connection);
-    const keypair = Keypair.generate();
+    const mintKeypair = Keypair.generate();
+    const lamports = await connection.getMinimumBalanceForRentExemption(
+      MINT_SIZE
+    );
 
     const transaction = new Transaction().add(
       SystemProgram.createAccount({
-        fromPubkey: publicKey,
-        newAccountPubkey: keypair.publicKey,
+        fromPubkey: wallet.publicKey,
+        newAccountPubkey: mintKeypair.publicKey,
         lamports,
-        programId: SystemProgram.programId,
+        programId: TOKEN_PROGRAM_ID,
         space: MINT_SIZE,
       }),
       createInitializeMint2Instruction(
-        keypair.publicKey,
+        mintKeypair.publicKey,
         decimals,
-        publicKey,
-        publicKey,
-        SystemProgram.programId
+        wallet.publicKey,
+        wallet.publicKey, // Mint and Freeze authority (change if needed)
+        TOKEN_PROGRAM_ID
       )
     );
+
+    try {
+      const recentBlockhash = await connection.getLatestBlockhash();
+      transaction.recentBlockhash = recentBlockhash.blockhash;
+      transaction.feePayer = wallet.publicKey;
+
+      setDecimals(decimals);
+
+      transaction.partialSign(mintKeypair);
+      await wallet.sendTransaction(transaction, connection);
+
+      alert(`Token account is created ${mintKeypair.publicKey}`);
+    } catch (error) {
+      console.log('Transaction failed', error);
+    }
+  };
+
+  const transferSol = async (recepient: PublicKey, amount: number) => {
+    if (!wallet.publicKey || !wallet.connected) {
+      console.log('wallet is not connected');
+      return;
+    }
+
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: wallet.publicKey,
+        toPubkey: recepient,
+        lamports: amount * LAMPORTS_PER_SOL,
+      })
+    );
+
+    try {
+      const sig = await wallet.sendTransaction(transaction, connection);
+      await connection.confirmTransaction(sig, 'confirmed');
+      alert(`Transfer successful: ${sig}`);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  // New request airdrop function
+  const requestAirdrop = async (amount: number) => {
+    if (!wallet.publicKey || !wallet.connected) {
+      throw new Error('Wallet not connected');
+    }
+
+    try {
+      const airdropSignature = await connection.requestAirdrop(
+        wallet.publicKey,
+        amount * LAMPORTS_PER_SOL
+      );
+
+      // Confirm the transaction
+      await connection.confirmTransaction(airdropSignature, 'confirmed');
+      alert(`Airdrop successful: ${airdropSignature}`);
+    } catch (error) {
+      console.log('Airdrop failed', error);
+    }
   };
 
   return {
     createToken,
+    transferSol,
+    requestAirdrop, // Make airdrop accessible
   };
 };

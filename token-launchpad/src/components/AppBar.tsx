@@ -15,20 +15,14 @@ export default function AppBar() {
         <div className="cursor-pointer" onClick={() => router.push('/create')}>
           create
         </div>
-        <div className="cursor-pointer" onClick={() => router.push('/burn')}>
-          burn
-        </div>
         <div
           className="cursor-pointer"
           onClick={() => router.push('/transfer')}
         >
           transfer
         </div>
-        <div
-          className="cursor-pointer"
-          onClick={() => router.push('/delegate')}
-        >
-          delegate
+        <div className="cursor-pointer" onClick={() => router.push('/airdrop')}>
+          airdrop
         </div>
       </div>
       {/* right section */}
